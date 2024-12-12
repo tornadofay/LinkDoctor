@@ -150,7 +150,7 @@ namespace LinkDoctor.src.core
                         endpoints.Add(new PingEndpoint(config.Name, config.Address, settings.TimeoutMs));
                 }
             }
-          //  endpoints.Add(new HttpEndpoint("Google HTTP Check", "http://www.gstatic.com/generate_204", settings.TimeoutMs));
+            //  endpoints.Add(new HttpEndpoint("Google HTTP Check", "http://www.gstatic.com/generate_204", settings.TimeoutMs));
 
 
             return endpoints;
@@ -209,7 +209,7 @@ namespace LinkDoctor.src.core
                 diagnosticsEndpoints.AddRange(InitializeEndpoints());
                 if (!diagnosticsEndpoints.Any(e => e is DnsEndpoint))
                 {
-                    diagnosticsEndpoints.Add(new DnsEndpoint("Google DNS Resolution", "dns.google", 1000));
+                    diagnosticsEndpoints.Add(new DnsEndpoint("Google DNS Resolution", "dns.google", timeout: settings.TimeoutMs));
                 }
 
                 foreach (var endpoint in diagnosticsEndpoints)
@@ -305,9 +305,9 @@ namespace LinkDoctor.src.core
             if (!isConnected)
             {
                 diagnostics.Add("Connection lost. Performing comprehensive diagnostics...");
-                var comprehensiveDiagnostics = await PerformComprehensiveDiagnostics(1, 0);
+                var comprehensiveDiagnostics = await PerformComprehensiveDiagnostics(retryAttempts: settings.RetryAttempts, retryDelayMs: settings.RetryDelayMs);
 
-                // Handle comprehensive diagnostics result (omitted for brevity)
+                // Handle comprehensive diagnostics result
 
                 UpdateConnectionState(false, string.Join("\n", diagnostics));
             }
