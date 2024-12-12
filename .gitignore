@@ -1,0 +1,41 @@
+# Visual Studio temporary/generated files
+*.suo
+*.user
+*.sln.DotSettings
+*.tmp
+*.pdb
+*.cache
+*.opensdf
+*.ncb
+*.aps
+*.pch
+*.obj
+*.res
+*.tlb
+*.ilk
+*.bsc
+*.exe
+*.dll
+*.vspscc
+*.vssscc
+*.scc
+*.manifest
+*.winmd
+*.pri
+
+# User-specific files
+*.suo
+*.user
+*.vspscc
+*.vssscc
+*.scc
+
+# Build output
+bin/
+obj/
+
+# Packages
+packages/
+
+# Local settings
+.vs/
