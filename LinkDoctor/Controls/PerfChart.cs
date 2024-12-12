@@ -10,6 +10,7 @@ namespace SpPerfChart
         private const int MAX_VALUE_COUNT = 512;
         private const int GRID_SPACING = 20;
         private const int LEFT_MARGIN = 50; // Margin to the left for Y-axis labels
+        private const int TIME_INTERVAL_SECONDS = 5; // Time interval between vertical grid lines
         #endregion
 
         #region Member Variables
@@ -106,7 +107,8 @@ namespace SpPerfChart
         public void AddValue(double value)
         {
             needsRecalculation = true;
-            ChartAppend(value);
+            // Use -1 to indicate timeout/failure
+            ChartAppend(value < 0 ? double.NaN : value);
             Invalidate();
         }
         #endregion
@@ -170,25 +172,47 @@ namespace SpPerfChart
             if (visibleValuesArray.Length == 0)
                 return;
 
-            Point[] points = new Point[visibleValuesArray.Length];
+            List<Point> points = new List<Point>();
             int x = Width - 1;
-            int idx = 0;
+            
             for (int i = visibleValuesArray.Length - 1; i >= 0; i--)
             {
                 double val = visibleValuesArray[i];
-                int y = CalcVerticalPosition(val, minValue, maxValue);
-                points[idx++] = new Point(x, y);
+                
+                if (double.IsNaN(val))
+                {
+                    // Draw timeout indicator
+                    int y = 10; // Near top of chart
+                    g.FillRectangle(new SolidBrush(Color.Red), x - 2, y, 4, 8);
+                    
+                    // If we have points, draw the path up to here
+                    if (points.Count > 1)
+                    {
+                        using (GraphicsPath path = new GraphicsPath())
+                        {
+                            path.AddLines(points.ToArray());
+                            g.DrawPath(chartLinePenCache, path);
+                        }
+                        points.Clear();
+                    }
+                }
+                else
+                {
+                    int y = CalcVerticalPosition(val, minValue, maxValue);
+                    points.Add(new Point(x, y));
+                }
+                
                 x -= valueSpacing;
-
                 if (x < LEFT_MARGIN)
                     break;
             }
 
-            if (points.Length > 1)
+            // Draw any remaining points
+            if (points.Count > 1)
             {
                 using (GraphicsPath path = new GraphicsPath())
                 {
-                    path.AddLines(points);
+                    path.AddLines(points.ToArray());
                     g.DrawPath(chartLinePenCache, path);
                 }
             }
@@ -202,9 +226,17 @@ namespace SpPerfChart
 
             if (perfChartStyle.ShowVerticalGridLines)
             {
+                int timeIndex = 0;
                 for (int i = Width - gridScrollOffset; i >= LEFT_MARGIN; i -= GRID_SPACING)
                 {
                     g.DrawLine(verticalGridPenCache, i, 0, i, Height);
+                    
+                    // Draw time labels
+                    int seconds = timeIndex * TIME_INTERVAL_SECONDS;
+                    string timeLabel = $"{seconds}";
+                    SizeF size = g.MeasureString(timeLabel, Font);
+                    g.DrawString(timeLabel, Font, textBrush, i - (size.Width / 2), Height - size.Height);
+                    timeIndex++;
                 }
             }
 
