@@ -7,6 +7,7 @@ using System.Text;
 
 namespace LinkDoctor.src.core
 {
+
     public class NetworkMonitor : IDisposable
     {
         private readonly List<INetworkEndpoint> endpoints;
@@ -136,6 +137,7 @@ namespace LinkDoctor.src.core
             {
                 endpoints.Add(new PingEndpoint("Google DNS", "8.8.8.8", settings.TimeoutMs));
                 endpoints.Add(new PingEndpoint("Cloudflare DNS", "1.1.1.1", settings.TimeoutMs));
+                endpoints.Add(new HttpEndpoint("Google HTTP Check", "http://www.gstatic.com/generate_204", settings.TimeoutMs));
                 endpoints.Add(new DnsEndpoint("Google DNS Resolution", "dns.google", settings.TimeoutMs));
             }
             else
@@ -148,6 +150,8 @@ namespace LinkDoctor.src.core
                         endpoints.Add(new PingEndpoint(config.Name, config.Address, settings.TimeoutMs));
                 }
             }
+          //  endpoints.Add(new HttpEndpoint("Google HTTP Check", "http://www.gstatic.com/generate_204", settings.TimeoutMs));
+
 
             return endpoints;
         }
@@ -197,14 +201,12 @@ namespace LinkDoctor.src.core
                 };
 
                 var diagnosticsEndpoints = new List<INetworkEndpoint>
-            {
-                new LocalNetworkEndpoint(),
-                new GatewayEndpoint(),
-                new UplinkEndpoint()
-            };
-
+                {
+                    new LocalNetworkEndpoint(),
+                    new GatewayEndpoint(),
+                    new UplinkEndpoint()
+                };
                 diagnosticsEndpoints.AddRange(InitializeEndpoints());
-
                 if (!diagnosticsEndpoints.Any(e => e is DnsEndpoint))
                 {
                     diagnosticsEndpoints.Add(new DnsEndpoint("Google DNS Resolution", "dns.google", 1000));
@@ -227,7 +229,6 @@ namespace LinkDoctor.src.core
 
                     await Task.Delay(retryDelayMs);
                 }
-
                 ComprehensiveDiagnosticsCompleted?.Invoke(this, new ComprehensiveDiagnosticsCompletedEventArgs(diagnostics));
 
                 return diagnostics;
