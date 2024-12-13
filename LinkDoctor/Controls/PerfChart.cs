@@ -158,10 +158,11 @@ namespace SpPerfChart
             if (maxValue == minValue)
                 return Height / 2;
 
-            double range = maxValue - minValue;
-            double normalizedValue = (value - minValue) / range;
-            int drawingHeight = Height - (2 * VERTICAL_MARGIN);
-            int y = VERTICAL_MARGIN + (int)(drawingHeight * (1 - normalizedValue));
+            // Calculate position based on grid spacing
+            int numberOfGridLines = Height / GRID_SPACING;
+            double centerValue = drawValues.Any() ? drawValues.First() : 0;
+            int gridPosition = numberOfGridLines / 2 - (int)(value - centerValue);
+            int y = gridPosition * GRID_SPACING;
             return y;
         }
 
@@ -188,8 +189,8 @@ namespace SpPerfChart
                 if (double.IsNaN(val))
                 {
                     // Draw timeout indicator
-                    int y = 10; // Near top of chart
-                    g.FillRectangle(new SolidBrush(Color.Red), x - 2, y, 4, 8);
+                   // int y = 10; // Near top of chart
+                //    g.FillRectangle(new SolidBrush(Color.Yellow), x - 2, y, 4, 8);
 
                     // If we have points, draw the path up to here
                     if (points.Count > 1)
@@ -257,23 +258,19 @@ namespace SpPerfChart
 
             if (perfChartStyle.ShowHorizontalGridLines)
             {
+                // Calculate grid lines centered on the first value
+                double centerValue = drawValues.Any() ? drawValues.First() : 0;
                 int numberOfGridLines = Height / GRID_SPACING;
+                
                 for (int i = 0; i <= numberOfGridLines; i++)
                 {
                     int y = i * GRID_SPACING;
                     g.DrawLine(horizontalGridPenCache, LEFT_MARGIN, y, Width, y);
 
-                    // Y-axis labels
-                    double lineValue = CalcLineValue(y, minValue, maxValue);
-                    string label;
-                    if (maxValue - minValue < 10) // If range is small, show more decimal places
-                        label = lineValue.ToString("G6"); // Up to 6 significant digits
-                    else if (maxValue - minValue < 100) // Medium range
-                        label = lineValue.ToString("G4"); // Up to 4 significant digits
-                    else // Large range
-                        label = lineValue.ToString("G3"); // Up to 3 significant digits
+                    // Calculate the value at this grid line position
+                    double value = centerValue + ((numberOfGridLines / 2) - i);
+                    string label = ((int)value).ToString();
                     SizeF size = g.MeasureString(label, Font);
-
                     g.DrawString(label, Font, textBrush, LEFT_MARGIN - size.Width - 5, y - size.Height / 2);
                 }
             }
@@ -315,13 +312,15 @@ namespace SpPerfChart
             }
             else
             {
-                minValue = currentMin;
-                maxValue = currentMax;
+                // Center around the first value
+                double centerValue = drawValues.First();
+                double range = 10; // Show ±10 units from center value
+                minValue = centerValue - range;
+                maxValue = centerValue + range;
 
-                // Add padding
-                double rangePadding = (maxValue - minValue) * 0.2; // 20% padding
-                minValue -= rangePadding;
-                maxValue += rangePadding;
+                // Ensure we include current min/max if they're outside this range
+                minValue = Math.Min(minValue, currentMin);
+                maxValue = Math.Max(maxValue, currentMax);
 
                 if (minValue < 0)
                     minValue = 0;

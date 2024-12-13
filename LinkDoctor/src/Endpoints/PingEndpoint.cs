@@ -2,6 +2,7 @@
 using LinkDoctor.src.Models;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Diagnostics;
 
 namespace LinkDoctor.src.Endpoints
 {
@@ -34,7 +35,6 @@ namespace LinkDoctor.src.Endpoints
                 await semaphore.WaitAsync();
                 var reply = await ping.SendPingAsync(address, timeout);
                 bool isSuccessful = reply.Status == IPStatus.Success;
-
                 diagnostics.PingTime = isSuccessful ? reply.RoundtripTime : (long?)null;
                 diagnostics.ComponentStatus.Add((Name, isSuccessful));
 

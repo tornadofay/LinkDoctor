@@ -75,7 +75,7 @@
             txtRoute.Name = "txtRoute";
             txtRoute.Size = new Size(154, 23);
             txtRoute.TabIndex = 2;
-            txtRoute.Text = "google.com";
+            txtRoute.Text = "8.8.8.8";
             txtRoute.TextAlign = HorizontalAlignment.Center;
             // 
             // btnTraceRoute
