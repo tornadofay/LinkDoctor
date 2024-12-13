@@ -10,6 +10,7 @@ namespace SpPerfChart
         private const int MAX_VALUE_COUNT = 512;
         private const int GRID_SPACING = 20;
         private const int LEFT_MARGIN = 50; // Margin to the left for Y-axis labels
+        private const int VERTICAL_MARGIN = 10; // Pixels of margin at top and bottom
         private const int TIME_INTERVAL_SECONDS = 5; // Time interval between vertical grid lines
         #endregion
 
@@ -26,6 +27,7 @@ namespace SpPerfChart
         private Pen chartLinePenCache;
         private SolidBrush textBrush;
         private SolidBrush backGroundSolidBrushCache;
+        private Pen verticalGridBoldPenCache;
 
         private double sum = 0;
         private int count = 0;
@@ -79,6 +81,7 @@ namespace SpPerfChart
             chartLinePenCache = perfChartStyle.ChartLinePen.Pen;
             textBrush = new SolidBrush(perfChartStyle.TextColor);
             backGroundSolidBrushCache = new SolidBrush(perfChartStyle.BackgroundColor);
+            verticalGridBoldPenCache = new Pen(verticalGridPenCache.Color, 3f);
         }
         #endregion
 
@@ -148,6 +151,8 @@ namespace SpPerfChart
             }
         }
 
+       
+
         private int CalcVerticalPosition(double value, double minValue, double maxValue)
         {
             if (maxValue == minValue)
@@ -155,7 +160,8 @@ namespace SpPerfChart
 
             double range = maxValue - minValue;
             double normalizedValue = (value - minValue) / range;
-            int y = Convert.ToInt32(Math.Round(Height * (1 - normalizedValue)));
+            int drawingHeight = Height - (2 * VERTICAL_MARGIN);
+            int y = VERTICAL_MARGIN + (int)(drawingHeight * (1 - normalizedValue));
             return y;
         }
 
@@ -174,17 +180,17 @@ namespace SpPerfChart
 
             List<Point> points = new List<Point>();
             int x = Width - 1;
-            
+
             for (int i = visibleValuesArray.Length - 1; i >= 0; i--)
             {
                 double val = visibleValuesArray[i];
-                
+
                 if (double.IsNaN(val))
                 {
                     // Draw timeout indicator
                     int y = 10; // Near top of chart
                     g.FillRectangle(new SolidBrush(Color.Red), x - 2, y, 4, 8);
-                    
+
                     // If we have points, draw the path up to here
                     if (points.Count > 1)
                     {
@@ -201,7 +207,7 @@ namespace SpPerfChart
                     int y = CalcVerticalPosition(val, minValue, maxValue);
                     points.Add(new Point(x, y));
                 }
-                
+
                 x -= valueSpacing;
                 if (x < LEFT_MARGIN)
                     break;
@@ -229,10 +235,19 @@ namespace SpPerfChart
                 int timeIndex = 0;
                 for (int i = Width - gridScrollOffset; i >= LEFT_MARGIN; i -= GRID_SPACING)
                 {
-                    g.DrawLine(verticalGridPenCache, i, 0, i, Height);
-                    
+                    int seconds = (timeIndex * TIME_INTERVAL_SECONDS) % 60;
+
+                    // Use a bolder pen for 0-second lines
+                    if (seconds == 0)
+                    {
+                        g.DrawLine(verticalGridBoldPenCache, i, 0, i, Height);
+                    }
+                    else
+                    {
+                        g.DrawLine(verticalGridPenCache, i, 0, i, Height);
+                    }
+
                     // Draw time labels
-                    int seconds = timeIndex * TIME_INTERVAL_SECONDS;
                     string timeLabel = $"{seconds}";
                     SizeF size = g.MeasureString(timeLabel, Font);
                     g.DrawString(timeLabel, Font, textBrush, i - (size.Width / 2), Height - size.Height);
@@ -250,7 +265,13 @@ namespace SpPerfChart
 
                     // Y-axis labels
                     double lineValue = CalcLineValue(y, minValue, maxValue);
-                    string label = lineValue.ToString("F0"); // Display as integer
+                    string label;
+                    if (maxValue - minValue < 10) // If range is small, show more decimal places
+                        label = lineValue.ToString("G6"); // Up to 6 significant digits
+                    else if (maxValue - minValue < 100) // Medium range
+                        label = lineValue.ToString("G4"); // Up to 4 significant digits
+                    else // Large range
+                        label = lineValue.ToString("G3"); // Up to 3 significant digits
                     SizeF size = g.MeasureString(label, Font);
 
                     g.DrawString(label, Font, textBrush, LEFT_MARGIN - size.Width - 5, y - size.Height / 2);

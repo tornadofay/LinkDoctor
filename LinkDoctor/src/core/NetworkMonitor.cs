@@ -268,10 +268,10 @@ namespace LinkDoctor.src.core
                             EmitSuccessLog(endpoint.Name, endpointDiagnostics.PingTime);
 
                             // Invoke PingTimeChanged event if needed
-                            // Send ping time or -1 for timeout
-                            PingTimeChanged?.Invoke(this, new PingTimeChangedEventArgs(
-                                endpointDiagnostics.PingTime ?? -1,
-                                DateTime.Now));
+                            if (endpointDiagnostics.PingTime.HasValue)
+                            {
+                                PingTimeChanged?.Invoke(this, new PingTimeChangedEventArgs(endpointDiagnostics.PingTime.Value, DateTime.Now));
+                            }
 
                             break;
                         }
