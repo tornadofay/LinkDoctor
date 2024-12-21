@@ -151,29 +151,27 @@ namespace SpPerfChart
             }
         }
 
-       
-
         private int CalcVerticalPosition(double value, double minValue, double maxValue)
         {
-            if (maxValue == minValue)
+            if (double.IsNaN(value))
+                return 0;
+
+            if (maxValue <= minValue)
                 return Height / 2;
 
-            // Calculate position based on grid spacing
-            int numberOfGridLines = Height / GRID_SPACING;
-            double centerValue = drawValues.Any() ? drawValues.First() : 0;
-            int gridPosition = numberOfGridLines / 2 - (int)(value - centerValue);
-            int y = gridPosition * GRID_SPACING;
-            return y;
+            // Calculate position using the full range including padding
+            int effectiveHeight = Height - (2 * VERTICAL_MARGIN);
+            double normalizedValue = (value - minValue) / (maxValue - minValue);
+            int y = Height - VERTICAL_MARGIN - (int)(normalizedValue * effectiveHeight);
+
+            // Clamp the value to prevent drawing outside bounds
+            return Math.Clamp(y, VERTICAL_MARGIN, Height - VERTICAL_MARGIN);
         }
 
-        private double CalcLineValue(int yPosition, double minValue, double maxValue)
-        {
-            double value = minValue + (Height - yPosition) * (maxValue - minValue) / Height;
-            return value;
-        }
         #endregion
 
         #region Drawing Methods
+
         private void DrawChart(Graphics g, double[] visibleValuesArray, double minValue, double maxValue)
         {
             if (visibleValuesArray.Length == 0)
@@ -188,10 +186,6 @@ namespace SpPerfChart
 
                 if (double.IsNaN(val))
                 {
-                    // Draw timeout indicator
-                   // int y = 10; // Near top of chart
-                //    g.FillRectangle(new SolidBrush(Color.Yellow), x - 2, y, 4, 8);
-
                     // If we have points, draw the path up to here
                     if (points.Count > 1)
                     {
@@ -228,7 +222,6 @@ namespace SpPerfChart
         private void DrawBackgroundAndGrid(Graphics g, double minValue, double maxValue)
         {
             Rectangle baseRectangle = new Rectangle(LEFT_MARGIN, 0, Width - LEFT_MARGIN, Height);
-
             g.FillRectangle(backGroundSolidBrushCache, baseRectangle);
 
             if (perfChartStyle.ShowVerticalGridLines)
@@ -258,23 +251,71 @@ namespace SpPerfChart
 
             if (perfChartStyle.ShowHorizontalGridLines)
             {
-                // Calculate grid lines centered on the first value
-                double centerValue = drawValues.Any() ? drawValues.First() : 0;
-                int numberOfGridLines = Height / GRID_SPACING;
-                
-                for (int i = 0; i <= numberOfGridLines; i++)
-                {
-                    int y = i * GRID_SPACING;
-                    g.DrawLine(horizontalGridPenCache, LEFT_MARGIN, y, Width, y);
+                // Calculate the number of grid lines based on available height
+                int effectiveHeight = Height - (2 * VERTICAL_MARGIN);
+                int numberOfGridLines = effectiveHeight / GRID_SPACING;
 
-                    // Calculate the value at this grid line position
-                    double value = centerValue + ((numberOfGridLines / 2) - i);
-                    string label = ((int)value).ToString();
-                    SizeF size = g.MeasureString(label, Font);
-                    g.DrawString(label, Font, textBrush, LEFT_MARGIN - size.Width - 5, y - size.Height / 2);
+                // Calculate value increment per grid line
+                double valueRange = maxValue - minValue;
+                double valueIncrement = valueRange / numberOfGridLines;
+
+                // Round the increment to a nice number
+                valueIncrement = RoundToNiceNumber(valueIncrement);
+
+                // Adjust min and max values to align with grid lines
+                double adjustedMin = Math.Floor(minValue / valueIncrement) * valueIncrement;
+                double adjustedMax = Math.Ceiling(maxValue / valueIncrement) * valueIncrement;
+
+                // Draw grid lines and labels
+                for (double value = adjustedMin; value <= adjustedMax; value += valueIncrement)
+                {
+                    int y = CalcVerticalPosition(value, minValue, maxValue);
+
+                    if (y >= VERTICAL_MARGIN && y <= Height - VERTICAL_MARGIN)
+                    {
+                        g.DrawLine(horizontalGridPenCache, LEFT_MARGIN, y, Width, y);
+
+                        // Format the label based on the value
+                        string label = FormatAxisLabel(value);
+                        SizeF size = g.MeasureString(label, Font);
+                        g.DrawString(label, Font, textBrush, LEFT_MARGIN - size.Width - 5, y - size.Height / 2);
+                    }
                 }
             }
         }
+
+        private string FormatAxisLabel(double value)
+        {
+            if (value >= 1000)
+            {
+                return $"{value:F0}";  // No decimals for large numbers
+            }
+            else if (value >= 100)
+            {
+                return $"{value:F1}";  // One decimal for medium numbers
+            }
+            else
+            {
+                return $"{value:F2}";  // Two decimals for small numbers
+            }
+        }
+
+        private double RoundToNiceNumber(double value)
+        {
+            // Find the magnitude of the value
+            double magnitude = Math.Pow(10, Math.Floor(Math.Log10(value)));
+            double normalized = value / magnitude;
+
+            // Round to a nice number
+            double niceNormalized;
+            if (normalized < 1.5) niceNormalized = 1;
+            else if (normalized < 3) niceNormalized = 2;
+            else if (normalized < 7) niceNormalized = 5;
+            else niceNormalized = 10;
+
+            return niceNormalized * magnitude;
+        }
+
         #endregion
 
         #region Overrides
@@ -309,21 +350,43 @@ namespace SpPerfChart
             {
                 minValue = 0;
                 maxValue = 100;
+                return;
             }
-            else
+
+            // Get the current visible values
+            int visibleValues = (Width - LEFT_MARGIN) / valueSpacing;
+            visibleValues = Math.Min(visibleValues, drawValues.Count);
+
+            var values = drawValues.TakeLast(visibleValues).Where(v => !double.IsNaN(v)).ToList();
+
+            if (!values.Any())
             {
-                // Center around the first value
-                double centerValue = drawValues.First();
-                double range = 10; // Show ±10 units from center value
-                minValue = centerValue - range;
-                maxValue = centerValue + range;
+                minValue = 0;
+                maxValue = 100;
+                return;
+            }
 
-                // Ensure we include current min/max if they're outside this range
-                minValue = Math.Min(minValue, currentMin);
-                maxValue = Math.Max(maxValue, currentMax);
+            // Calculate the mean and range of visible values
+            double min = values.Min();
+            double max = values.Max();
+            double range = max - min;
 
-                if (minValue < 0)
-                    minValue = 0;
+            // Add padding (10% on each side)
+            double padding = range * 0.1;
+
+            // Ensure minimum range and padding
+            if (range < 10)
+            {
+                padding = 5;  // Minimum 5 units padding when range is small
+            }
+
+            minValue = Math.Max(0, min - padding);
+            maxValue = max + padding;
+
+            // Ensure minimum range
+            if (maxValue - minValue < 20)
+            {
+                maxValue = minValue + 20;
             }
         }
 
